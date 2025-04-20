@@ -7,7 +7,7 @@ const About = () => {
 
   useEffect(() => {
     // Fetch top cakes from backend
-    fetch("http://localhost:5000/api/cakes?limit=3")
+    fetch("http://localhost:8000/api/cakes?limit=3")
       .then((res) => res.json())
       .then((data) => setTopCakes(data))
       .catch((err) => console.error("Failed to fetch cakes", err));

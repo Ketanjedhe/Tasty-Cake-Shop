@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -23,17 +22,13 @@ const Signup = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const res = await axios.post("http://localhost:5000/api/signup", formData);
-      toast.success(res.data.message || "Signup successful!");
-      navigate("/login");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Signup failed");
-    }
+    // Mock signup: always succeed
+    toast.success("Signup successful! (Mock)");
+    navigate("/login");
   };
 
   return (
-    <section className="bg-gray-100 min-h-screen flex justify-center items-center">
+    <div className="min-h-screen flex items-center justify-center bg-purple-50">
       <div className="bg-[#dfa674] shadow-lg rounded-2xl flex flex-col w-96 p-6">
         <h2 className="font-bold text-3xl text-[#002D74] text-center">Sign Up</h2>
         <p className="text-sm mt-2 text-[#002D74] text-center">Create a new account</p>
@@ -61,7 +56,7 @@ const Signup = () => {
           <button onClick={() => navigate("/login")} className="text-white bg-[#002D74] hover:border-gray-400 rounded-xl py-2 px-5 hover:scale-110 duration-300">Login</button>
         </div>
       </div>
-    </section>
+    </div>
   );
 };
 

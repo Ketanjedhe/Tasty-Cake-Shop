@@ -11,12 +11,17 @@ const Home = () => {
     <div className="min-h-screen w-full bg-pink-100 flex flex-col">
       <Header />
 
-      <div className="flex flex-col items-center gap-10 p-10 text-center">
+      <div className="flex flex-col items-center gap-10 p-10 text-center w-full max-w-5xl mx-auto">
         {/* Hero Text */}
         <div className="max-w-3xl">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-pink-800 font-cursive leading-snug">
-            Welcome to <span className="bg-pink-500 text-white px-3 py-1 rounded-md">Tasty Cake & Bakers</span>
+            Welcome to
           </h1>
+          <div className="inline-block mt-2">
+            <span className="bg-pink-500 text-white px-4 py-2 rounded-md text-4xl sm:text-5xl font-extrabold font-cursive block">
+              Tasty Cake & Bakers
+            </span>
+          </div>
           <h2 className="text-xl font-semibold text-pink-500 mt-4">
             “If you eat once, you will come back.”
           </h2>

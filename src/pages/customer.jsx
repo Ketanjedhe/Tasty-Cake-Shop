@@ -1,8 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import CustomerHeader from "../components/customerHeader";
+import Card from "../components/card";
+import Cart from "../components/cart";
+import OrderHistory from "../components/orderHistory";
+import OffersSection from "../components/offersSection"; // <-- import offers section
 
 // Dummy data for demonstration
-const dummyOrders = [
+const dummyOrdersInit = [
   { id: 1, date: "2024-06-01", items: ["Chocolate Cake", "Cupcake"], total: 350, status: "Delivered" },
   { id: 2, date: "2024-06-10", items: ["Red Velvet Cake"], total: 500, status: "Processing" },
 ];
@@ -14,9 +18,72 @@ const dummyProfile = {
   loyaltyPoints: 120,
 };
 
-const dummyCart = [
-  { id: 1, name: "Chocolate Cake", qty: 1, price: 300 },
-  { id: 2, name: "Cupcake", qty: 2, price: 50 },
+// Dummy products for the shop with categories
+const dummyProducts = [
+  {
+    id: 1,
+    title: "Chocolate Cake",
+    price: 300,
+    image: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80",
+    description: "Rich and moist chocolate cake topped with creamy chocolate frosting.",
+    category: "Cakes",
+  },
+  {
+    id: 2,
+    title: "Red Velvet Cake",
+    price: 500,
+    image: "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80",
+    description: "Classic red velvet cake with smooth cream cheese icing.",
+    category: "Cakes",
+  },
+  {
+    id: 3,
+    title: "Vanilla Pastry",
+    price: 80,
+    image: "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80",
+    description: "Soft vanilla pastry with whipped cream.",
+    category: "Pastries",
+  },
+  {
+    id: 4,
+    title: "Chocolate Pastry",
+    price: 90,
+    image: "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80",
+    description: "Delicious chocolate pastry with chocolate chips.",
+    category: "Pastries",
+  },
+  {
+    id: 5,
+    title: "Veg Puff",
+    price: 40,
+    image: "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80",
+    description: "Crispy puff stuffed with spicy veggies.",
+    category: "Snacks",
+  },
+  {
+    id: 6,
+    title: "Cookies",
+    price: 30,
+    image: "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80",
+    description: "Crunchy and delicious cookies, perfect for snacking.",
+    category: "Snacks",
+  },
+  {
+    id: 7,
+    title: "Cupcake",
+    price: 50,
+    image: "https://images.unsplash.com/photo-1519864600265-abb23847ef2c?auto=format&fit=crop&w=400&q=80",
+    description: "Soft and fluffy cupcakes in assorted flavors.",
+    category: "Cakes",
+  },
+];
+
+const categories = [
+  { name: "All", icon: "🎂" },
+  { name: "Cakes", icon: "🍰" },
+  { name: "Pastries", icon: "🥮" },
+  { name: "Snacks", icon: "🍪" },
+  { name: "Offers", icon: "🎁" }, // <-- add Offers to sidebar
 ];
 
 const Customer = () => {
@@ -26,7 +93,25 @@ const Customer = () => {
   const [profile, setProfile] = useState({ ...dummyProfile });
   const [editProfile, setEditProfile] = useState({ ...dummyProfile });
   const [isEditing, setIsEditing] = useState(false);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [cart, setCart] = useState([]);
+  const [orders, setOrders] = useState(dummyOrdersInit);
+  const [search, setSearch] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [feedbacks, setFeedbacks] = useState([]);
+  const [offers, setOffers] = useState([]); // <-- use offers state
   const profileMenuRef = useRef(null);
+
+  useEffect(() => {
+    // Simulate fetching offers uploaded by admin (from localStorage or backend)
+    // For demo, we use localStorage (set in admin offers component)
+    const adminOffers = JSON.parse(localStorage.getItem("admin_offers") || "[]");
+    setOffers(adminOffers);
+  }, []);
 
   // Close the profile menu if clicked outside
   useEffect(() => {
@@ -58,39 +143,116 @@ const Customer = () => {
   // Simulate profile update
   const handleProfileUpdate = (e) => {
     e.preventDefault();
+    // Password update logic
+    if (password || confirmPassword) {
+      if (password !== confirmPassword) {
+        setPasswordError("Passwords do not match.");
+        return;
+      }
+      setPasswordError("");
+    }
     setProfile({ ...editProfile });
     setIsEditing(false);
+    setShowProfile(false);
+    setPassword("");
+    setConfirmPassword("");
+    setPasswordError("");
+  };
+
+  // Add product to cart
+  const handleAddToCart = (product) => {
+    setCart((prev) => {
+      const found = prev.find((item) => item.id === product.id);
+      if (found) {
+        return prev.map((item) =>
+          item.id === product.id ? { ...item, qty: item.qty + 1 } : item
+        );
+      }
+      return [...prev, { ...product, qty: 1 }];
+    });
+  };
+
+  // Remove product from cart
+  const handleRemoveFromCart = (id) => {
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  // Mock checkout: add to orders and clear cart, add loyalty points
+  const handleCheckout = () => {
+    if (cart.length === 0) return;
+    const newOrder = {
+      id: orders.length + 1,
+      date: new Date().toISOString().slice(0, 10),
+      items: cart.map((item) => item.title),
+      total: cart.reduce((sum, item) => sum + item.qty * item.price, 0),
+      status: "Processing",
+    };
+    setOrders([newOrder, ...orders]);
+    setCart([]);
+    setShowCart(false);
+    setProfileTab("orders");
+    setShowProfile(true);
+
+    // Calculate total products ordered
+    const totalProducts = cart.reduce((sum, item) => sum + item.qty, 0);
+    setProfile((prev) => ({
+      ...prev,
+      loyaltyPoints: prev.loyaltyPoints + totalProducts * 5,
+    }));
+  };
+
+  // Handle feedback submit
+  const handleFeedbackSubmit = (e) => {
+    e.preventDefault();
+    if (feedback.trim() === "") return;
+    setFeedbacks([{ text: feedback, date: new Date().toLocaleString() }, ...feedbacks]);
+    setFeedback("");
   };
 
   // Calculate cart total
-  const cartTotal = dummyCart.reduce((sum, item) => sum + item.qty * item.price, 0);
+  const cartTotal = cart.reduce((sum, item) => sum + item.qty * item.price, 0);
+
+  // Filter products by category and search
+  const filteredProducts = dummyProducts.filter((p) => {
+    const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+    const matchesSearch =
+      search.trim() === "" ||
+      p.title.toLowerCase().includes(search.toLowerCase()) ||
+      p.description.toLowerCase().includes(search.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div className="min-h-screen bg-white text-gray-800 flex flex-col">
-      <CustomerHeader
-        onCartClick={() => {
-          setShowCart(true);
-          setShowProfile(false);
-        }}
-        onProfileClick={() => {
-          setShowProfile((prev) => !prev);
-          setShowCart(false);
-          setProfileTab("");
-        }}
-      />
-      <main className="flex-1 p-6 relative">
-        {/* Profile Dropdown Box in Corner */}
+      {/* Make header fixed */}
+      <div className="fixed top-0 left-0 right-0 z-30">
+        <CustomerHeader
+          onCartClick={() => {
+            setShowCart(true);
+            setShowProfile(false);
+          }}
+          onProfileClick={() => {
+            setShowProfile((prev) => !prev);
+            setShowCart(false);
+            setProfileTab("");
+          }}
+        />
+        {/* Profile dropdown box from logo origin */}
         {showProfile && (
           <div
             ref={profileMenuRef}
-            className="absolute right-8 top-6 z-50 bg-white border border-blue-200 rounded-xl shadow-lg w-56"
+            className="absolute right-8 top-4 md:top-6 z-50 bg-white border border-blue-200 rounded-xl shadow-lg w-56"
+            style={{
+              right: '2.5rem',
+              top: '4.5rem',
+            }}
           >
             <div className="flex flex-col py-2">
               <button
                 className={`px-4 py-3 text-left hover:bg-blue-50 transition rounded-t-xl ${
                   profileTab === "profile" ? "bg-blue-100 font-semibold" : ""
                 }`}
-                onClick={() => { setProfileTab("profile"); setIsEditing(false); }}
+                onClick={() => { setProfileTab("profile"); setIsEditing(true); }}
               >
                 Update Profile
               </button>
@@ -105,151 +267,289 @@ const Customer = () => {
             </div>
           </div>
         )}
-
-        {/* Profile Content */}
-        {profileTab === "profile" && showProfile && (
-          <div className="bg-blue-50 rounded-xl shadow p-6 mb-6 max-w-md mx-auto mt-16">
-            <h2 className="text-xl font-semibold mb-4">Profile</h2>
-            {!isEditing ? (
-              <div>
-                <div><strong>Name:</strong> {profile.name}</div>
-                <div><strong>Email:</strong> {profile.email}</div>
-                <div><strong>Mobile:</strong> {profile.mobile}</div>
-                <div className="mt-2"><strong>Loyalty Points:</strong> {profile.loyaltyPoints}</div>
-                <button
-                  className="mt-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                  onClick={() => setIsEditing(true)}
-                >
-                  Edit Profile
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleProfileUpdate} className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={editProfile.name}
-                    onChange={handleProfileChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={editProfile.email}
-                    onChange={handleProfileChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Mobile</label>
-                  <input
-                    type="tel"
-                    name="mobile"
-                    value={editProfile.mobile}
-                    onChange={handleProfileChange}
-                    className="w-full p-2 border rounded"
-                    required
-                  />
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <button
-                    type="submit"
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-                    onClick={() => { setIsEditing(false); setEditProfile(profile); }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        )}
-        {profileTab === "orders" && showProfile && (
-          <div className="bg-blue-50 rounded-xl shadow p-6 mb-6 max-w-2xl mx-auto mt-16">
-            <h2 className="text-xl font-semibold mb-4">Order History</h2>
-            <table className="w-full text-left">
-              <thead>
-                <tr>
-                  <th className="py-2">Order ID</th>
-                  <th>Date</th>
-                  <th>Items</th>
-                  <th>Total</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dummyOrders.map(order => (
-                  <tr key={order.id} className="border-t">
-                    <td className="py-2">{order.id}</td>
-                    <td>{order.date}</td>
-                    <td>{order.items.join(", ")}</td>
-                    <td>₹{order.total}</td>
-                    <td>{order.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Cart Section */}
-        {showCart && (
-          <div className="bg-pink-50 rounded-xl shadow p-6 mb-6 max-w-md">
-            <h2 className="text-xl font-semibold mb-2">Your Cart</h2>
-            {dummyCart.length === 0 ? (
-              <div className="text-gray-500">Your cart is empty.</div>
-            ) : (
-              <ul>
-                {dummyCart.map(item => (
-                  <li key={item.id} className="flex justify-between py-2 border-b">
-                    <span>{item.name} x {item.qty}</span>
-                    <span>₹{item.qty * item.price}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="mt-4 font-bold text-right">Total: ₹{cartTotal}</div>
-            <button className="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-              Proceed to Checkout
+      </div>
+      <main className="flex-1 flex relative">
+        {/* Sidebar (fixed, goes behind header on scroll) */}
+        <div
+          className={`transition-all duration-300 bg-white shadow-lg h-[calc(100vh-72px)] py-8 ${
+            sidebarExpanded ? "w-48" : "w-16"
+          } flex flex-col items-center z-10 fixed left-0 top-[72px]`}
+          style={{ zIndex: 10 }}
+          onMouseEnter={() => setSidebarExpanded(true)}
+          onMouseLeave={() => setSidebarExpanded(false)}
+        >
+          {categories.map((cat) => (
+            <button
+              key={cat.name}
+              className={`flex items-center w-full px-3 py-3 my-1 rounded-lg transition ${
+                selectedCategory === cat.name
+                  ? "bg-pink-400 text-white"
+                  : "hover:bg-pink-200 text-pink-800"
+              }`}
+              onClick={() => setSelectedCategory(cat.name)}
+            >
+              <span className="text-xl">{cat.icon}</span>
+              <span
+                className={`ml-3 font-semibold transition-all duration-200 ${
+                  sidebarExpanded ? "opacity-100" : "opacity-0 w-0"
+                }`}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                {sidebarExpanded && cat.name}
+              </span>
             </button>
-          </div>
-        )}
+          ))}
+          {/* Logout button at the bottom */}
+          <div className="flex-1" />
+          <button
+            className="w-full flex items-center justify-center px-3 py-3 mt-4 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition font-semibold"
+            onClick={() => window.location.href = '/'}
+            title="Logout"
+          >
+            <span className="text-xl">🚪</span>
+            <span
+              className={`ml-3 transition-all duration-200 ${
+                sidebarExpanded ? "opacity-100" : "opacity-0 w-0"
+              }`}
+              style={{ whiteSpace: "nowrap" }}
+            >
+              {sidebarExpanded && "Logout"}
+            </span>
+          </button>
+        </div>
 
-        {/* Product Browsing & Ordering Section */}
-        {!showProfile && !showCart && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-green-100 rounded-xl shadow p-6">
-              <h2 className="text-xl font-semibold mb-2">Browse & Order Products</h2>
-              <p>Explore our delicious products and place your order.</p>
-              <div className="mt-4 text-gray-500 italic">Product browsing and ordering coming soon...</div>
+        {/* Main Content */}
+        <div className="flex-1 p-6 ml-16 md:ml-48 mt-[72px] flex flex-col md:flex-row gap-8">
+          {/* Show Offers section if Offers is selected in sidebar */}
+          {selectedCategory === "Offers" ? (
+            <div className="flex-1">
+              <OffersSection offers={offers} />
             </div>
-            <div className="bg-green-100 rounded-xl shadow p-6">
-              <h2 className="text-xl font-semibold mb-2">Feedback</h2>
-              <p>Leave feedback about your experience with us.</p>
-              <div className="mt-4 text-gray-500 italic">Feedback form coming soon...</div>
-            </div>
-            <div className="bg-green-100 rounded-xl shadow p-6 md:col-span-2">
-              <h2 className="text-xl font-semibold mb-2">Loyalty Points</h2>
-              <p>Earn and track loyalty points with every purchase.</p>
-              <div className="mt-2 text-lg font-bold text-green-700">
-                Current Points: {profile.loyaltyPoints}
+          ) : (
+            // ...existing main content for products, feedback, etc...
+            <>
+              {/* Left: Product Browsing & Ordering Section */}
+              <div className="flex-1">
+                {/* Search Bar */}
+                {!showCart && (
+                  <div className="flex justify-center mb-8">
+                    <input
+                      type="text"
+                      placeholder="Search for cakes, pastries, snacks..."
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      className="w-full max-w-md px-4 py-2 border border-pink-300 rounded-full shadow focus:outline-none focus:ring-2 focus:ring-pink-400 text-lg"
+                      style={{ fontFamily: "'Comic Sans MS', cursive" }}
+                    />
+                  </div>
+                )}
+
+                {/* Product Browsing & Ordering Section */}
+                {!showCart && (
+                  <div>
+                    <h2 className="text-2xl font-bold mb-6 text-[#8c2673]">
+                      {selectedCategory === "All" ? "Shop Products" : selectedCategory}
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+                      {filteredProducts.map(product => (
+                        <div key={product.id} className="h-full">
+                          <div className="bg-white p-4 shadow-md rounded-lg hover:shadow-xl transition duration-300 flex flex-col h-full">
+                            <img
+                              src={product.image}
+                              alt={product.title}
+                              className="w-full h-48 object-cover rounded-md mb-2"
+                              loading="lazy"
+                            />
+                            <div className="flex-1 flex flex-col">
+                              <h3 className="text-lg font-semibold mb-1" style={{ fontFamily: "'Pacifico', cursive, 'Comic Sans MS', cursive" }}>{product.title}</h3>
+                              <p className="text-green-600 font-bold mb-1">₹{product.price}</p>
+                              <p className="text-gray-600 text-sm mb-2 flex-1">{product.description}</p>
+                            </div>
+                            <button
+                              className="mt-3 bg-gradient-to-r from-pink-500 to-pink-700 text-white px-6 py-2 rounded-full font-cursive text-lg shadow-lg tracking-wide w-full whitespace-nowrap overflow-hidden text-ellipsis"
+                              style={{ fontFamily: "'Pacifico', cursive, 'Comic Sans MS', cursive" }}
+                              onClick={() => handleAddToCart(product)}
+                            >
+                              Add to Cart
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {filteredProducts.length === 0 && (
+                        <div className="col-span-full text-center text-gray-500 text-lg mt-8">
+                          No products found.
+                        </div>
+                      )}
+                    </div>
+                    {/* Feedback and Loyalty Points */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
+                      {/* Feedback Section */}
+                      <div className="bg-green-100 rounded-xl shadow p-6 flex flex-col">
+                        <h2 className="text-xl font-semibold mb-2">Feedback</h2>
+                        <p>Leave feedback about your experience with us.</p>
+                        <form onSubmit={handleFeedbackSubmit} className="mt-4 flex flex-col gap-2">
+                          <textarea
+                            className="p-2 rounded border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-400"
+                            rows={3}
+                            placeholder="Your feedback..."
+                            value={feedback}
+                            onChange={e => setFeedback(e.target.value)}
+                            required
+                          />
+                          <button
+                            type="submit"
+                            className="self-end bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
+                          >
+                            Submit
+                          </button>
+                        </form>
+                        {/* Show feedbacks */}
+                        {feedbacks.length > 0 && (
+                          <div className="mt-4">
+                            <h3 className="font-semibold mb-2 text-green-700">Recent Feedback</h3>
+                            <ul className="space-y-2 max-h-32 overflow-y-auto">
+                              {feedbacks.map((fb, idx) => (
+                                <li key={idx} className="bg-white rounded p-2 shadow text-sm">
+                                  <div>{fb.text}</div>
+                                  <div className="text-xs text-gray-400 mt-1">{fb.date}</div>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                      {/* Loyalty Points Section */}
+                      <div className="bg-green-100 rounded-xl shadow p-6">
+                        <h2 className="text-xl font-semibold mb-2">Loyalty Points</h2>
+                        <p>Earn and track loyalty points with every purchase.</p>
+                        <div className="mt-2 text-lg font-bold text-green-700">
+                          Current Points: {profile.loyaltyPoints}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Cart Section */}
+                {showCart && (
+                  <Cart
+                    cart={cart}
+                    onCheckout={handleCheckout}
+                    onRemove={handleRemoveFromCart}
+                  />
+                )}
+              </div>
+            </>
+          )}
+          {/* Profile/OrderHistory Section as Modal Form */}
+          {showProfile && profileTab === "profile" && isEditing && (
+            <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+              <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
+                <button
+                  className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
+                  onClick={() => { setShowProfile(false); setIsEditing(false); setPassword(""); setConfirmPassword(""); setPasswordError(""); }}
+                  title="Close"
+                >
+                  &times;
+                </button>
+                <h2 className="text-2xl font-bold mb-4 text-blue-700">Update Profile</h2>
+                <form onSubmit={handleProfileUpdate} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Name</label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={editProfile.name}
+                      onChange={handleProfileChange}
+                      className="w-full p-2 border rounded"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={editProfile.email}
+                      onChange={handleProfileChange}
+                      className="w-full p-2 border rounded"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Mobile</label>
+                    <input
+                      type="tel"
+                      name="mobile"
+                      value={editProfile.mobile}
+                      onChange={handleProfileChange}
+                      className="w-full p-2 border rounded"
+                      required
+                    />
+                  </div>
+                  {/* Password fields */}
+                  <div>
+                    <label className="block text-sm font-medium mb-1">New Password</label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="w-full p-2 border rounded"
+                      placeholder="Enter new password"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Confirm Password</label>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      className="w-full p-2 border rounded"
+                      placeholder="Confirm new password"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  {passwordError && (
+                    <div className="text-red-600 text-sm">{passwordError}</div>
+                  )}
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      type="submit"
+                      className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                      onClick={() => { setIsEditing(false); setShowProfile(false); setPassword(""); setConfirmPassword(""); setPasswordError(""); }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
-          </div>
-        )}
+          )}
+          {/* Order History Modal */}
+          {showProfile && profileTab === "orders" && (
+            <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+              <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-2xl relative">
+                <button
+                  className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
+                  onClick={() => { setShowProfile(false); setProfileTab(""); }}
+                  title="Close"
+                >
+                  &times;
+                </button>
+                <h2 className="text-2xl font-bold mb-4 text-blue-700">Order History</h2>
+                <OrderHistory orders={orders} />
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
