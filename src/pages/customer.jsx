@@ -4,6 +4,7 @@ import Card from "../components/card";
 import Cart from "../components/cart";
 import OrderHistory from "../components/orderHistory";
 import OffersSection from "../components/offersSection"; // <-- import offers section
+import { toast } from "react-toastify";
 
 // Dummy data for demonstration
 const dummyOrdersInit = [
@@ -86,6 +87,12 @@ const categories = [
   { name: "Offers", icon: "🎁" }, // <-- add Offers to sidebar
 ];
 
+const branches = [
+  { id: 1, name: "Central", location: "Delhi" },
+  { id: 2, name: "West", location: "Mumbai" },
+  { id: 3, name: "East", location: "Kolkata" },
+];
+
 const Customer = () => {
   const [showProfile, setShowProfile] = useState(false);
   const [showCart, setShowCart] = useState(false);
@@ -99,11 +106,21 @@ const Customer = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [cart, setCart] = useState([]);
-  const [orders, setOrders] = useState(dummyOrdersInit);
+  const [orders, setOrders] = useState(() => {
+    // Load orders for this customer from localStorage
+    const allOrders = JSON.parse(localStorage.getItem("all_customer_orders") || "[]");
+    // Optionally, filter by customer email if needed
+    // For now, show all orders placed by this customer (by email)
+    return allOrders.filter(order => order.customerEmail === (dummyProfile.email || ""));
+  });
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState("");
   const [feedbacks, setFeedbacks] = useState([]);
   const [offers, setOffers] = useState([]); // <-- use offers state
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false);
   const profileMenuRef = useRef(null);
 
   useEffect(() => {
@@ -112,6 +129,15 @@ const Customer = () => {
     const adminOffers = JSON.parse(localStorage.getItem("admin_offers") || "[]");
     setOffers(adminOffers);
   }, []);
+
+  // Update orders state when order status is changed by branch manager
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const allOrders = JSON.parse(localStorage.getItem("all_customer_orders") || "[]");
+      setOrders(allOrders.filter(order => order.customerEmail === (profile.email || "")));
+    }, 2000); // Poll every 2 seconds for updates
+    return () => clearInterval(interval);
+  }, [profile.email]);
 
   // Close the profile menu if clicked outside
   useEffect(() => {
@@ -164,10 +190,12 @@ const Customer = () => {
     setCart((prev) => {
       const found = prev.find((item) => item.id === product.id);
       if (found) {
+        toast.success("Added to cart!");
         return prev.map((item) =>
           item.id === product.id ? { ...item, qty: item.qty + 1 } : item
         );
       }
+      toast.success("Added to cart!");
       return [...prev, { ...product, qty: 1 }];
     });
   };
@@ -177,21 +205,51 @@ const Customer = () => {
     setCart((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Mock checkout: add to orders and clear cart, add loyalty points
+  // Find nearest branch by city (simple match for demo)
+  const getNearestBranch = (city) => {
+    const found = branches.find(
+      (b) => b.location.toLowerCase() === city.trim().toLowerCase()
+    );
+    return found ? found.name : "Central";
+  };
+
+  // Modified checkout handler to collect address
   const handleCheckout = () => {
     if (cart.length === 0) return;
+    setShowCheckoutForm(true);
+  };
+
+  // Finalize order after address form
+  const handlePlaceOrder = (e) => {
+    e.preventDefault();
+    if (!address || !city || !pincode) {
+      toast.error("Please fill all address details.");
+      return;
+    }
+    const branch = getNearestBranch(city);
     const newOrder = {
       id: orders.length + 1,
       date: new Date().toISOString().slice(0, 10),
       items: cart.map((item) => item.title),
       total: cart.reduce((sum, item) => sum + item.qty * item.price, 0),
       status: "Processing",
+      address,
+      city,
+      pincode,
+      branch,
+      customerName: profile.name || "Customer",
+      customerEmail: profile.email || "", // <-- add email for branch manager
     };
     setOrders([newOrder, ...orders]);
     setCart([]);
     setShowCart(false);
     setProfileTab("orders");
     setShowProfile(true);
+    setShowCheckoutForm(false);
+
+    // Save to all_customer_orders in localStorage for branch manager view
+    const allOrders = JSON.parse(localStorage.getItem("all_customer_orders") || "[]");
+    localStorage.setItem("all_customer_orders", JSON.stringify([newOrder, ...allOrders]));
 
     // Calculate total products ordered
     const totalProducts = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -199,6 +257,8 @@ const Customer = () => {
       ...prev,
       loyaltyPoints: prev.loyaltyPoints + totalProducts * 5,
     }));
+
+    toast.success("Order placed successfully!");
   };
 
   // Handle feedback submit
@@ -430,12 +490,74 @@ const Customer = () => {
                   </div>
                 )}
                 {/* Cart Section */}
-                {showCart && (
+                {showCart && !showCheckoutForm && (
                   <Cart
                     cart={cart}
                     onCheckout={handleCheckout}
                     onRemove={handleRemoveFromCart}
                   />
+                )}
+                {/* Checkout Address Form */}
+                {showCart && showCheckoutForm && (
+                  <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
+                    <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md relative">
+                      <button
+                        className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 text-2xl"
+                        onClick={() => setShowCheckoutForm(false)}
+                        title="Close"
+                      >
+                        &times;
+                      </button>
+                      <h2 className="text-2xl font-bold mb-4 text-blue-700">Enter Delivery Details</h2>
+                      <form onSubmit={handlePlaceOrder} className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Address</label>
+                          <input
+                            type="text"
+                            value={address}
+                            onChange={e => setAddress(e.target.value)}
+                            className="w-full p-2 border rounded"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">City</label>
+                          <input
+                            type="text"
+                            value={city}
+                            onChange={e => setCity(e.target.value)}
+                            className="w-full p-2 border rounded"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Pincode</label>
+                          <input
+                            type="text"
+                            value={pincode}
+                            onChange={e => setPincode(e.target.value)}
+                            className="w-full p-2 border rounded"
+                            required
+                          />
+                        </div>
+                        <div className="flex gap-2 mt-4">
+                          <button
+                            type="submit"
+                            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                          >
+                            Place Order
+                          </button>
+                          <button
+                            type="button"
+                            className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
+                            onClick={() => setShowCheckoutForm(false)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
                 )}
               </div>
             </>

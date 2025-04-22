@@ -1,16 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer
 } from "recharts";
-
-const dummyOrders = [
-  { id: 1, date: "2024-06-20", total: 1200, customerName: "John Doe", status: "Delivered" },
-  { id: 2, date: "2024-06-20", total: 800, customerName: "Priya Sharma", status: "Processing" },
-  { id: 3, date: "2024-06-19", total: 950, customerName: "Amit Kumar", status: "Delivered" },
-  { id: 4, date: "2024-06-18", total: 1100, customerName: "Rahul Singh", status: "Cancelled" },
-  { id: 5, date: "2024-06-18", total: 700, customerName: "Neha Verma", status: "Delivered" },
-];
 
 // Helper: group by date
 const getOrdersByDate = (orders) => {
@@ -39,18 +31,48 @@ const statusColors = {
 };
 
 const OrdersAnalysis = ({ show }) => {
-  const totalOrders = dummyOrders.length;
-  const totalAmount = dummyOrders.reduce((sum, o) => sum + o.total, 0);
-  const today = new Date().toISOString().slice(0, 10);
-  const dailyOrders = dummyOrders.filter((o) => o.date === today);
-
+  // Load all orders placed by customers from localStorage (simulate backend)
+  const [allOrders, setAllOrders] = useState([]);
   const [statusFilter, setStatusFilter] = useState("All");
+
+  useEffect(() => {
+    // Simulate fetching all orders placed by customers (saved in localStorage by customer page)
+    const savedOrders = JSON.parse(localStorage.getItem("all_customer_orders") || "[]");
+    setAllOrders(savedOrders);
+  }, []);
+
+  // Update order status and sync to localStorage
+  const handleStatusChange = (orderId, newStatus) => {
+    const updatedOrders = allOrders.map(order =>
+      order.id === orderId ? { ...order, status: newStatus } : order
+    );
+    setAllOrders(updatedOrders);
+    localStorage.setItem("all_customer_orders", JSON.stringify(updatedOrders));
+  };
+
+  const ordersToShow = allOrders.length > 0
+    ? (statusFilter === "All"
+        ? allOrders
+        : allOrders.filter(order => order.status === statusFilter))
+    : [
+        // fallback dummy data if no orders in localStorage
+        { id: 1, date: "2024-06-20", total: 1200, customerName: "John Doe", customerEmail: "john@example.com", status: "Delivered", branch: "Central" },
+        { id: 2, date: "2024-06-20", total: 800, customerName: "Priya Sharma", customerEmail: "priya@example.com", status: "Processing", branch: "West" },
+        { id: 3, date: "2024-06-19", total: 950, customerName: "Amit Kumar", customerEmail: "amit@example.com", status: "Delivered", branch: "East" },
+        { id: 4, date: "2024-06-18", total: 1100, customerName: "Rahul Singh", customerEmail: "rahul@example.com", status: "Cancelled", branch: "Central" },
+        { id: 5, date: "2024-06-18", total: 700, customerName: "Neha Verma", customerEmail: "neha@example.com", status: "Delivered", branch: "West" },
+      ];
+
+  const totalOrders = ordersToShow.length;
+  const totalAmount = ordersToShow.reduce((sum, o) => sum + (o.total || 0), 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const dailyOrders = ordersToShow.filter((o) => o.date === today);
 
   // Filtered orders for table
   const filteredOrders =
     statusFilter === "All"
-      ? dummyOrders
-      : dummyOrders.filter((order) => order.status === statusFilter);
+      ? ordersToShow
+      : ordersToShow.filter((order) => order.status === statusFilter);
 
   if (show === "orders") {
     return (
@@ -77,6 +99,8 @@ const OrdersAnalysis = ({ show }) => {
             <tr>
               <th className="py-2 px-4 border-b text-center">Order ID</th>
               <th className="py-2 px-4 border-b text-center">Customer Name</th>
+              <th className="py-2 px-4 border-b text-center">Customer Email</th>
+              <th className="py-2 px-4 border-b text-center">Branch</th>
               <th className="py-2 px-4 border-b text-center">Date</th>
               <th className="py-2 px-4 border-b text-center">Total</th>
               <th className="py-2 px-4 border-b text-center">Status</th>
@@ -86,18 +110,30 @@ const OrdersAnalysis = ({ show }) => {
             {filteredOrders.map((order) => (
               <tr key={order.id}>
                 <td className="py-2 px-4 border-b text-center">{order.id}</td>
-                <td className="py-2 px-4 border-b text-center">{order.customerName}</td>
+                <td className="py-2 px-4 border-b text-center">{order.customerName || "-"}</td>
+                <td className="py-2 px-4 border-b text-center">{order.customerEmail || "-"}</td>
+                <td className="py-2 px-4 border-b text-center">{order.branch || "-"}</td>
                 <td className="py-2 px-4 border-b text-center">{order.date}</td>
                 <td className="py-2 px-4 border-b text-center">₹{order.total}</td>
                 <td className="py-2 px-4 border-b text-center">
-                  <span
+                  <select
+                    value={order.status}
+                    onChange={e => handleStatusChange(order.id, e.target.value)}
                     className={
                       "px-3 py-1 rounded-full text-white text-sm " +
-                      (statusColors[order.status] || "bg-gray-400")
+                      (order.status === "Delivered"
+                        ? "bg-green-500"
+                        : order.status === "Processing"
+                        ? "bg-yellow-500"
+                        : order.status === "Cancelled"
+                        ? "bg-red-500"
+                        : "bg-gray-400")
                     }
                   >
-                    {order.status}
-                  </span>
+                    <option value="Processing">Processing</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
                 </td>
               </tr>
             ))}
@@ -108,8 +144,8 @@ const OrdersAnalysis = ({ show }) => {
   }
 
   // Analysis tab
-  const ordersByDate = getOrdersByDate(dummyOrders).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).reverse();
-  const salesByDate = getSalesByDate(dummyOrders).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).reverse();
+  const ordersByDate = getOrdersByDate(ordersToShow).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).reverse();
+  const salesByDate = getSalesByDate(ordersToShow).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5).reverse();
 
   return (
     <div>
@@ -160,12 +196,12 @@ const OrdersAnalysis = ({ show }) => {
       <div className="mt-8">
         <h3 className="text-xl font-semibold mb-2 text-pink-600">Order Trend (Last 3 Days)</h3>
         <ul className="list-disc ml-6 text-gray-700">
-          {[...new Set(dummyOrders.map(o => o.date))]
+          {[...new Set(ordersToShow.map(o => o.date))]
             .slice(0, 3)
             .map(date => (
               <li key={date}>
-                {date}: {dummyOrders.filter(o => o.date === date).length} orders, ₹
-                {dummyOrders.filter(o => o.date === date).reduce((sum, o) => sum + o.total, 0)}
+                {date}: {ordersToShow.filter(o => o.date === date).length} orders, ₹
+                {ordersToShow.filter(o => o.date === date).reduce((sum, o) => sum + o.total, 0)}
               </li>
             ))}
         </ul>
